@@ -12,9 +12,9 @@ import com.wilkom.cronproject.model.RawData;
 public class MyProcessor implements ItemProcessor<RawData, Account> {
 
     @Override
-    public Account process(final RawData account) throws Exception {
+    public Account process(final RawData data) throws Exception {
 
-        return new Account(account.getId(), account.getName().toUpperCase(),
-                account.getAmount(), LocalDateTime.now());
+        return new Account(data.getId(), data.getName().toUpperCase(),
+                data.getAmount(), LocalDateTime.now());
     }
 }
