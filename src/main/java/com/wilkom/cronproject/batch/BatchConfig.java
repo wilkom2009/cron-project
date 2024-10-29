@@ -39,11 +39,8 @@ public class BatchConfig {
                 .resource(new ClassPathResource(fileInput))
                 .delimited()
                 .names("id", "name", "amount")
-                .fieldSetMapper(new BeanWrapperFieldSetMapper<RawData>() {
-                    {
-                        setTargetType(RawData.class);
-                    }
-                })
+                .targetType(
+                        RawData.class)
                 .build();
     }
 
