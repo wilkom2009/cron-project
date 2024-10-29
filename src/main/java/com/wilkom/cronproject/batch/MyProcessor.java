@@ -1,23 +1,22 @@
 package com.wilkom.cronproject.batch;
 
+import java.time.LocalDateTime;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.stereotype.Component;
 
 import com.wilkom.cronproject.model.Account;
+import com.wilkom.cronproject.model.RawData;
 
 @Component
-public class MyProcessor implements ItemProcessor<Account, Account> {
-
-    private static final Logger logger = LoggerFactory.getLogger(MyProcessor.class);
+public class MyProcessor implements ItemProcessor<RawData, Account> {
 
     @Override
-    public Account process(final Account account) throws Exception {
+    public Account process(final RawData account) throws Exception {
 
-        Account transformedCoffee = new Account(account.getId(), account.getHolder().toUpperCase(),
-                account.getBalance());
-
-        return transformedCoffee;
+        return new Account(account.getId(), account.getName().toUpperCase(),
+                account.getAmount(), LocalDateTime.now());
     }
 }
