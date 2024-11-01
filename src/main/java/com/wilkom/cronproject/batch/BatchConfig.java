@@ -1,7 +1,5 @@
 package com.wilkom.cronproject.batch;
 
-import java.io.InputStream;
-
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
@@ -21,11 +19,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.transaction.PlatformTransactionManager;
 
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.model.GetObjectRequest;
-import com.amazonaws.services.s3.model.S3Object;
+import com.wilkom.cronproject.exception.SkippableException;
 import com.wilkom.cronproject.model.Account;
 import com.wilkom.cronproject.model.RawData;
+import com.wilkom.cronproject.service.S3Service;
 
 import jakarta.annotation.Nonnull;
 
@@ -40,7 +37,17 @@ public class BatchConfig {
     private String fileInput;
 
     @Autowired
-    private AmazonS3 amazonS3Client;
+    private S3Service s3Service;
+
+    @Bean
+    public SkipListenerImpl skipListener() {
+        return new SkipListenerImpl();
+    }
+
+    @Bean
+    public JobCompletionNotificationListener jobCompletionListener() {
+        return new JobCompletionNotificationListener(skipListener(), s3Service);
+    }
 
     @Bean
     public Tasklet myTasklet() {
@@ -52,7 +59,7 @@ public class BatchConfig {
     @Nonnull
     public FlatFileItemReader<RawData> reader() {
         FlatFileItemReader<RawData> reader = new FlatFileItemReader<>();
-        reader.setResource(new InputStreamResource(getInputStream(bucketName, key)));
+        reader.setResource(new InputStreamResource(s3Service.getS3ObjectAsInputStream(bucketName, key)));
         reader.setLinesToSkip(1); // Skip header row if present
 
         DefaultLineMapper<RawData> lineMapper = new DefaultLineMapper<>();
@@ -77,6 +84,10 @@ public class BatchConfig {
                 .reader(reader())
                 .processor(processor())
                 .writer(writer())
+                .faultTolerant()
+                .skip(SkippableException.class)
+                .skipLimit(10000) // Adjust this value as needed
+                .listener(skipListener())
                 .build();
     }
 
@@ -85,6 +96,7 @@ public class BatchConfig {
     public Job myJob(JobRepository jobRepository, Step step) {
         return new JobBuilder("myJob", jobRepository)
                 .start(step)
+                .listener(jobCompletionListener())
                 .build();
     }
 
@@ -96,10 +108,5 @@ public class BatchConfig {
     @Bean
     public MyWriter writer() {
         return new MyWriter();
-    }
-
-    public InputStream getInputStream(String bucketName, String key) {
-        S3Object s3Object = amazonS3Client.getObject(new GetObjectRequest(bucketName, key));
-        return s3Object.getObjectContent();
     }
 }
