@@ -5,7 +5,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobExecutionListener;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.lang.NonNull;
+import org.springframework.stereotype.Component;
 
 import com.wilkom.cronproject.exception.S3ObjectNotFoundException;
 import com.wilkom.cronproject.model.RawData;
@@ -16,16 +18,22 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+@Component
 public class JobCompletionNotificationListener implements JobExecutionListener {
     private static Logger logger = LoggerFactory.getLogger(JobCompletionNotificationListener.class);
 
     private final SkipListenerImpl skipListener;
     private final S3Service s3Service;
     private final JobExecutionContext jobExecutionContext;
-    private static final String bucketName = "ws-cron-job-bucket";
-    private static final String failedBucketName = "ws-cron-job-bucket/failed";
-    private static final String key = "data-list.csv";
-    private static final String failedKey = "data-list";
+
+    @Value("${s3.bucket.name}")
+    private String bucketName;
+
+    @Value("${s3.bucket.failed.name}")
+    private String failedBucketName;
+
+    @Value("${s3.data.key}")
+    private String rawDataKey;
 
     @Autowired
     public JobCompletionNotificationListener(SkipListenerImpl skipListener, S3Service s3Service,
@@ -53,10 +61,25 @@ public class JobCompletionNotificationListener implements JobExecutionListener {
             performRawDataFileCleanupAction();
             performSaveToS3SkippedItemsAction();
         } else {
+            performProcessingDataRevertRenaming();
             logger.error("Job failed!");
         }
     }
 
+    private void performProcessingDataRevertRenaming() {
+        String fileName = rawDataKey + ".csv";
+        String renamedFileName = "processing_" + fileName;
+
+        try {
+            s3Service.renameS3Object(bucketName, renamedFileName, fileName);
+        } catch (S3ObjectNotFoundException e) {
+            logger.error("Failed to rename S3 object: {}", renamedFileName);
+        }
+    }
+
+    /**
+     * Perform the processed data clean up
+     */
     private void performRawDataFileCleanupAction() {
 
         if (jobExecutionContext.getProcessedDataSize() != 0
@@ -64,7 +87,10 @@ public class JobCompletionNotificationListener implements JobExecutionListener {
             logger.info("{} items have been processed, cleaning up origin raw data file ...",
                     jobExecutionContext.getProcessedDataSize());
 
-            s3Service.deleteS3Object(bucketName, key);
+            String fileName = rawDataKey + ".csv";
+            String renamedFileName = "processing_" + fileName;
+
+            s3Service.deleteS3Object(bucketName, renamedFileName);
 
             logger.info("Cleaning up successfully done!");
         }
@@ -76,7 +102,7 @@ public class JobCompletionNotificationListener implements JobExecutionListener {
         if (!skippedItems.isEmpty()) {
             logger.info("Job completed. Saving skipped items to S3:");
             try {
-                String fkey = failedKey + "-" + LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                String fkey = rawDataKey + "-" + LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                         + ".csv";
                 s3Service.saveSkippedItemsToS3(failedBucketName, fkey, skippedItems);
                 logger.info("Skipped {} items saved to S3: s3://{}/{}", skippedItems.size(), failedBucketName, fkey);

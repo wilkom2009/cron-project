@@ -72,4 +72,22 @@ public class S3Service {
             logger.error("Error deleting object: {}", e.getMessage());
         }
     }
+
+    public void renameS3Object(String bucketName, String oldKey, String newKey) throws S3ObjectNotFoundException {
+        try {
+            // Copy the object to the new key
+            amazonS3Client.copyObject(bucketName, oldKey, bucketName, newKey);
+
+            // Delete the object with the old key
+            amazonS3Client.deleteObject(bucketName, oldKey);
+
+            logger.info("Object renamed successfully from {} to {}", oldKey, newKey);
+        } catch (AmazonS3Exception e) {
+            if (e.getErrorCode().equals("NoSuchKey")) {
+                throw new S3ObjectNotFoundException(
+                        "Failed to rename S3 object, object not found in S3: " + bucketName + "/" + oldKey, e);
+            }
+            throw e;
+        }
+    }
 }

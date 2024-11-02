@@ -27,3 +27,12 @@ server:
 
 file:
   input: account-list.csv
+
+# S3
+s3:
+  bucket:
+    name: ws-cron-job-bucket
+    failed:
+      name: ws-cron-job-bucket/failed
+  data:
+    key: data-list

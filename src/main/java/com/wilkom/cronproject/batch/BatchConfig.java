@@ -39,11 +39,11 @@ public class BatchConfig {
 
     private static Logger logger = LoggerFactory.getLogger(BatchConfig.class);
 
-    private static final String bucketName = "ws-cron-job-bucket";
-    private static final String key = "data-list.csv";
+    @Value("${s3.bucket.name}")
+    private String bucketName;
 
-    @Value("${file.input}")
-    private String fileInput;
+    @Value("${s3.data.key}")
+    private String rawDataKey;
 
     @Autowired
     private S3Service s3Service;
@@ -51,13 +51,24 @@ public class BatchConfig {
     @Autowired
     private AccountRepository accountRepository;
 
-    private InputStream getS3InputStream() {
+    private InputStream getS3InputStream(String fileName) {
         try {
-            return s3Service.getS3Object(bucketName, key);
+            return s3Service.getS3Object(bucketName, fileName);
         } catch (S3ObjectNotFoundException e) {
-            logger.error("S3 object not found: {}", key);
+            logger.error("S3 object not found: {}", fileName);
             return new ByteArrayInputStream(new byte[0]);
         }
+    }
+
+    private String renameInputFile() {
+        String fileName = rawDataKey + ".csv";
+        String renamedFileName = "processing_" + fileName;
+        try {
+            s3Service.renameS3Object(bucketName, fileName, renamedFileName);
+        } catch (S3ObjectNotFoundException e) {
+            return fileName;
+        }
+        return renamedFileName;
     }
 
     @Bean
@@ -80,8 +91,11 @@ public class BatchConfig {
     @StepScope // create a new instance for each step execution
     @Nonnull
     public FlatFileItemReader<RawData> reader() {
+
+        String renamedFileName = renameInputFile();
+
         FlatFileItemReader<RawData> reader = new FlatFileItemReader<>();
-        reader.setResource(new InputStreamResource(getS3InputStream()));
+        reader.setResource(new InputStreamResource(getS3InputStream(renamedFileName)));
         reader.setLinesToSkip(1); // Skip header row if present
 
         DefaultLineMapper<RawData> lineMapper = new DefaultLineMapper<>();
@@ -101,7 +115,8 @@ public class BatchConfig {
     @Bean
     @Nonnull
     public Step myStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
-        return new StepBuilder("myStep", jobRepository)
+        return new StepBuilder("myStep" + System
+                .currentTimeMillis(), jobRepository)
                 .<RawData, Account>chunk(50, transactionManager)
                 .reader(reader())
                 .processor(processor())
@@ -117,7 +132,8 @@ public class BatchConfig {
     @Bean
     @Nonnull
     public Job myJob(JobRepository jobRepository, Step step) {
-        return new JobBuilder("myJob", jobRepository)
+        return new JobBuilder("myJob" + System
+                .currentTimeMillis(), jobRepository)
                 .start(step)
                 .listener(jobCompletionListener(jobExecutionContext()))
                 .build();
