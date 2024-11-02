@@ -13,7 +13,6 @@ import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
-import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;
 import org.springframework.batch.item.file.mapping.DefaultLineMapper;
@@ -78,11 +77,6 @@ public class BatchConfig {
     }
 
     @Bean
-    public Tasklet myTasklet() {
-        return new TaskOne();
-    }
-
-    @Bean
     @StepScope // create a new instance for each step execution
     @Nonnull
     public FlatFileItemReader<RawData> reader() {
@@ -106,7 +100,7 @@ public class BatchConfig {
 
     @Bean
     @Nonnull
-    public Step myStep(JobRepository jobRepository, Tasklet myTasklet, PlatformTransactionManager transactionManager) {
+    public Step myStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("myStep", jobRepository)
                 .<RawData, Account>chunk(50, transactionManager)
                 .reader(reader())
