@@ -16,12 +16,22 @@ import com.wilkom.cronproject.repository.AccountRepository;
 public class MyWriter implements ItemWriter<Account> {
 
     List<Account> output = TransactionAwareProxyFactory.createTransactionalList();
+
+    private final AccountRepository accountRepository;
+    private final JobExecutionContext jobExecutionContext;
+
     @Autowired
-    private AccountRepository accountRepository;
+    public MyWriter(AccountRepository accountRepository, JobExecutionContext jobExecutionContext) {
+        this.jobExecutionContext = jobExecutionContext;
+        this.accountRepository = accountRepository;
+    }
 
     public void write(@NonNull Chunk<? extends Account> chunk) throws Exception {
         chunk.getItems().stream().forEach(
-                a -> accountRepository.save(a));
+                a -> {
+                    accountRepository.save(a);
+                    jobExecutionContext.incrementProcessedDataSize();
+                });
     }
 
 }

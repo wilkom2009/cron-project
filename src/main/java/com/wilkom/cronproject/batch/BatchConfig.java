@@ -1,8 +1,14 @@
 package com.wilkom.cronproject.batch;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
+import org.springframework.batch.core.configuration.annotation.JobScope;
 import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
@@ -19,9 +25,11 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import com.wilkom.cronproject.exception.S3ObjectNotFoundException;
 import com.wilkom.cronproject.exception.SkippableException;
 import com.wilkom.cronproject.model.Account;
 import com.wilkom.cronproject.model.RawData;
+import com.wilkom.cronproject.repository.AccountRepository;
 import com.wilkom.cronproject.service.S3Service;
 
 import jakarta.annotation.Nonnull;
@@ -29,6 +37,8 @@ import jakarta.annotation.Nonnull;
 @Configuration
 @EnableBatchProcessing
 public class BatchConfig {
+
+    private static Logger logger = LoggerFactory.getLogger(BatchConfig.class);
 
     private static final String bucketName = "ws-cron-job-bucket";
     private static final String key = "data-list.csv";
@@ -39,14 +49,32 @@ public class BatchConfig {
     @Autowired
     private S3Service s3Service;
 
+    @Autowired
+    private AccountRepository accountRepository;
+
+    private InputStream getS3InputStream() {
+        try {
+            return s3Service.getS3Object(bucketName, key);
+        } catch (S3ObjectNotFoundException e) {
+            logger.error("S3 object not found: {}", key);
+            return new ByteArrayInputStream(new byte[0]);
+        }
+    }
+
+    @Bean
+    @JobScope
+    public JobExecutionContext jobExecutionContext() {
+        return new JobExecutionContext();
+    }
+
     @Bean
     public SkipListenerImpl skipListener() {
         return new SkipListenerImpl();
     }
 
     @Bean
-    public JobCompletionNotificationListener jobCompletionListener() {
-        return new JobCompletionNotificationListener(skipListener(), s3Service);
+    public JobCompletionNotificationListener jobCompletionListener(JobExecutionContext jobExecutionContext) {
+        return new JobCompletionNotificationListener(skipListener(), s3Service, jobExecutionContext);
     }
 
     @Bean
@@ -59,7 +87,7 @@ public class BatchConfig {
     @Nonnull
     public FlatFileItemReader<RawData> reader() {
         FlatFileItemReader<RawData> reader = new FlatFileItemReader<>();
-        reader.setResource(new InputStreamResource(s3Service.getS3ObjectAsInputStream(bucketName, key)));
+        reader.setResource(new InputStreamResource(getS3InputStream()));
         reader.setLinesToSkip(1); // Skip header row if present
 
         DefaultLineMapper<RawData> lineMapper = new DefaultLineMapper<>();
@@ -85,6 +113,7 @@ public class BatchConfig {
                 .processor(processor())
                 .writer(writer())
                 .faultTolerant()
+                .skip(S3ObjectNotFoundException.class)
                 .skip(SkippableException.class)
                 .skipLimit(10000) // Adjust this value as needed
                 .listener(skipListener())
@@ -96,17 +125,17 @@ public class BatchConfig {
     public Job myJob(JobRepository jobRepository, Step step) {
         return new JobBuilder("myJob", jobRepository)
                 .start(step)
-                .listener(jobCompletionListener())
+                .listener(jobCompletionListener(jobExecutionContext()))
                 .build();
     }
 
     @Bean
     public MyProcessor processor() {
-        return new MyProcessor();
+        return new MyProcessor(jobExecutionContext());
     }
 
     @Bean
     public MyWriter writer() {
-        return new MyWriter();
+        return new MyWriter(accountRepository, jobExecutionContext());
     }
 }
