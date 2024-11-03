@@ -38,7 +38,7 @@ public class S3Service {
 
             // Write data
             for (RawData item : skippedItems) {
-                csvPrinter.printRecord(item.getId(), item.getName(), item.getAmount());
+                csvPrinter.printRecord(item.getName(), item.getAmount());
             }
         }
 

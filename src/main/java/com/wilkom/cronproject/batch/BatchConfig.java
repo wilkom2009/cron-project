@@ -29,6 +29,7 @@ import com.wilkom.cronproject.exception.SkippableException;
 import com.wilkom.cronproject.model.Account;
 import com.wilkom.cronproject.model.RawData;
 import com.wilkom.cronproject.repository.AccountRepository;
+import com.wilkom.cronproject.service.EmailService;
 import com.wilkom.cronproject.service.S3Service;
 
 import jakarta.annotation.Nonnull;
@@ -39,14 +40,17 @@ public class BatchConfig {
 
     private static Logger logger = LoggerFactory.getLogger(BatchConfig.class);
 
-    @Value("${s3.bucket.name}")
+    @Value("${aws.s3.bucket.name}")
     private String bucketName;
 
-    @Value("${s3.data.key}")
+    @Value("${aws.s3.data.key}")
     private String rawDataKey;
 
     @Autowired
     private S3Service s3Service;
+
+    @Autowired
+    private EmailService emailService;
 
     @Autowired
     private AccountRepository accountRepository;
@@ -84,7 +88,7 @@ public class BatchConfig {
 
     @Bean
     public JobCompletionNotificationListener jobCompletionListener(JobExecutionContext jobExecutionContext) {
-        return new JobCompletionNotificationListener(skipListener(), s3Service, jobExecutionContext);
+        return new JobCompletionNotificationListener(skipListener(), s3Service, jobExecutionContext, emailService);
     }
 
     @Bean
@@ -100,7 +104,7 @@ public class BatchConfig {
 
         DefaultLineMapper<RawData> lineMapper = new DefaultLineMapper<>();
         DelimitedLineTokenizer tokenizer = new DelimitedLineTokenizer();
-        tokenizer.setNames("id", "name", "amount");
+        tokenizer.setNames("name", "amount");
 
         BeanWrapperFieldSetMapper<RawData> fieldSetMapper = new BeanWrapperFieldSetMapper<>();
         fieldSetMapper.setTargetType(RawData.class);

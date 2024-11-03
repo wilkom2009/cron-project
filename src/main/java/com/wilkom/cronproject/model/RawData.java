@@ -11,8 +11,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class RawData {
 
-    private Integer id;
-
     private String name;
 
     private BigDecimal amount;
@@ -21,7 +19,6 @@ public class RawData {
     @Override
     public String toString() {
         return "RawData{" +
-                "id=" + id +
                 ", name='" + name + '\'' +
                 ", amount=" + amount +
                 '}';

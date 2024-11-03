@@ -28,11 +28,15 @@ server:
 file:
   input: account-list.csv
 
-# S3
-s3:
-  bucket:
-    name: ws-cron-job-bucket
-    failed:
-      name: ws-cron-job-bucket/failed
-  data:
-    key: data-list
+# AWS
+aws:
+  ses:
+    from-email: wilson@wilsonkomlan.com
+    to-email: dev@wilsonkomlan.com
+  s3:
+    bucket:
+      name: ws-cron-job-bucket
+      failed:
+        name: ws-cron-job-bucket/failed
+    data:
+      key: data-list

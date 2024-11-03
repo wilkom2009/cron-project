@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import com.wilkom.cronproject.exception.S3ObjectNotFoundException;
 import com.wilkom.cronproject.model.RawData;
+import com.wilkom.cronproject.service.EmailService;
 import com.wilkom.cronproject.service.S3Service;
 
 import java.io.IOException;
@@ -25,22 +26,27 @@ public class JobCompletionNotificationListener implements JobExecutionListener {
     private final SkipListenerImpl skipListener;
     private final S3Service s3Service;
     private final JobExecutionContext jobExecutionContext;
+    private final EmailService emailService;
 
-    @Value("${s3.bucket.name}")
+    @Value("${aws.s3.bucket.name}")
     private String bucketName;
 
-    @Value("${s3.bucket.failed.name}")
+    @Value("${aws.s3.bucket.failed.name}")
     private String failedBucketName;
 
-    @Value("${s3.data.key}")
+    @Value("${aws.s3.data.key}")
     private String rawDataKey;
+
+    @Value("${aws.ses.to-email}")
+    private String toEmail;
 
     @Autowired
     public JobCompletionNotificationListener(SkipListenerImpl skipListener, S3Service s3Service,
-            JobExecutionContext jobExecutionContext) {
+            JobExecutionContext jobExecutionContext, EmailService emailService) {
         this.skipListener = skipListener;
         this.s3Service = s3Service;
         this.jobExecutionContext = jobExecutionContext;
+        this.emailService = emailService;
     }
 
     @Override
@@ -58,10 +64,11 @@ public class JobCompletionNotificationListener implements JobExecutionListener {
                 logger.warn("Job completed, but {} S3 objects were not found", s3ObjectNotFoundCount);
             }
 
-            performRawDataFileCleanupAction();
+            performRawDataFileCleanupAction(jobExecution);
             performSaveToS3SkippedItemsAction();
         } else {
             performProcessingDataRevertRenaming();
+            sendSuccessEmailNotification(jobExecution, false);
             logger.error("Job failed!");
         }
     }
@@ -80,7 +87,7 @@ public class JobCompletionNotificationListener implements JobExecutionListener {
     /**
      * Perform the processed data clean up
      */
-    private void performRawDataFileCleanupAction() {
+    private void performRawDataFileCleanupAction(JobExecution jobExecution) {
 
         if (jobExecutionContext.getProcessedDataSize() != 0
                 && jobExecutionContext.getProcessedDataSize() <= jobExecutionContext.getRawDataSize()) {
@@ -93,6 +100,7 @@ public class JobCompletionNotificationListener implements JobExecutionListener {
             s3Service.deleteS3Object(bucketName, renamedFileName);
 
             logger.info("Cleaning up successfully done!");
+            sendSuccessEmailNotification(jobExecution, true);
         }
     }
 
@@ -110,5 +118,28 @@ public class JobCompletionNotificationListener implements JobExecutionListener {
                 logger.error("Error saving skipped items to S3: {}", e.getMessage());
             }
         }
+    }
+
+    private void sendSuccessEmailNotification(JobExecution jobExecution, boolean isSuccessful) {
+        String rootMsg = isSuccessful ? "completed successfully" : "failed";
+        // Send email notification
+        String emailBody = String.format(
+                "Job %s %s  at %s.<br><br>" +
+                        "Start time: %s<br>" +
+                        "End time: %s<br>" +
+                        "Status: %s<br>" +
+                        "Exit status: %s<br>",
+                jobExecution.getJobInstance().getJobName(),
+                rootMsg,
+                jobExecution.getEndTime(),
+                jobExecution.getStartTime(),
+                jobExecution.getEndTime(),
+                jobExecution.getStatus(),
+                jobExecution.getExitStatus().getExitDescription());
+
+        emailService.sendEmail(
+                toEmail,
+                "Batch Job Completed: " + jobExecution.getJobInstance().getJobName(),
+                emailBody);
     }
 }

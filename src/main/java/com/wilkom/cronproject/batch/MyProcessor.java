@@ -26,15 +26,13 @@ public class MyProcessor implements ItemProcessor<RawData, Account> {
 
         jobExecutionContext.incrementRawDataSize();
 
-        int randomInt = ThreadLocalRandom.current().nextInt(1, 1001);
-
         // Skip processing if the amount is greater than 500
         if (shouldSkip(data)) {
-            throw new SkippableException("Skipping item: " + data.getId());
+            throw new SkippableException("Skipping item: " + data.toString());
         }
 
         return new Account(
-                randomInt * data.getId(), data.getName().toUpperCase(),
+                0, data.getName().toUpperCase(),
                 data.getAmount(), LocalDateTime.now());
     }
 
