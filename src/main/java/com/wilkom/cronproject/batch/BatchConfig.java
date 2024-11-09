@@ -46,14 +46,18 @@ public class BatchConfig {
     @Value("${aws.s3.data.key}")
     private String rawDataKey;
 
-    @Autowired
-    private S3Service s3Service;
+    private final S3Service s3Service;
+
+    private final EmailService emailService;
+
+    private final AccountRepository accountRepository;
 
     @Autowired
-    private EmailService emailService;
-
-    @Autowired
-    private AccountRepository accountRepository;
+    public BatchConfig(AccountRepository accountRepository, S3Service s3Service, EmailService emailService) {
+        this.accountRepository = accountRepository;
+        this.s3Service = s3Service;
+        this.emailService = emailService;
+    }
 
     private InputStream getS3InputStream(String fileName) {
         try {

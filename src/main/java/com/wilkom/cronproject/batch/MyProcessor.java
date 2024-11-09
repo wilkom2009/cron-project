@@ -2,10 +2,10 @@ package com.wilkom.cronproject.batch;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.concurrent.ThreadLocalRandom;
 
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
 import com.wilkom.cronproject.exception.SkippableException;
@@ -22,7 +22,7 @@ public class MyProcessor implements ItemProcessor<RawData, Account> {
     }
 
     @Override
-    public Account process(final RawData data) throws Exception {
+    public Account process(@NonNull final RawData data) throws Exception {
 
         jobExecutionContext.incrementRawDataSize();
 

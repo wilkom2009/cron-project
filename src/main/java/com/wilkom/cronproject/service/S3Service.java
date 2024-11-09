@@ -26,8 +26,12 @@ import java.util.List;
 public class S3Service {
     private static Logger logger = LoggerFactory.getLogger(S3Service.class);
 
+    private final AmazonS3 amazonS3Client;
+
     @Autowired
-    private AmazonS3 amazonS3Client;
+    public S3Service(AmazonS3 amazonS3Client) {
+        this.amazonS3Client = amazonS3Client;
+    }
 
     public void saveSkippedItemsToS3(String bucketName, String key, List<RawData> skippedItems) throws IOException {
 

@@ -2,7 +2,6 @@ package com.wilkom.cronproject.service;
 
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailService;
 import com.amazonaws.services.simpleemail.model.*;
-import com.wilkom.cronproject.exception.CronProjectException;
 
 import java.util.List;
 
@@ -16,11 +15,15 @@ import org.springframework.stereotype.Service;
 public class EmailService {
     private static Logger logger = LoggerFactory.getLogger(EmailService.class);
 
-    @Autowired
-    private AmazonSimpleEmailService amazonSimpleEmailService;
+    private final AmazonSimpleEmailService amazonSimpleEmailService;
 
     @Value("${aws.ses.from-email}")
     private String fromEmail;
+
+    @Autowired
+    public EmailService(AmazonSimpleEmailService amazonSimpleEmailService) {
+        this.amazonSimpleEmailService = amazonSimpleEmailService;
+    }
 
     public void sendEmail(String to, String subject, String htmlBody) {
         sendEmail(List.of(to), subject, htmlBody);
@@ -41,9 +44,9 @@ public class EmailService {
 
             SendEmailResult result = amazonSimpleEmailService.sendEmail(request);
             logger.info("HTML email sent successfully. Message ID: {}", result.getMessageId());
-        } catch (Exception ex) {
+        } catch (MessageRejectedException ex) {
             logger.error("Failed to send HTML email. Error: {}", ex.getMessage(), ex);
-            throw new CronProjectException("Failed to send HTML email", ex);
+            throw new MessageRejectedException("Failed to send HTML email");
         }
     }
 }

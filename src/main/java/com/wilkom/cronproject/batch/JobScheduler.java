@@ -14,17 +14,21 @@ import org.springframework.scheduling.annotation.Scheduled;
 @EnableScheduling
 public class JobScheduler {
 
-    @Autowired
-    private JobLauncher jobLauncher;
+    private final JobLauncher jobLauncher;
+
+    private final BatchConfig batchConfig;
+
+    private final JobRepository jobRepository;
+
+    private final Step myStep1;
 
     @Autowired
-    private BatchConfig batchConfig;
-
-    @Autowired
-    private JobRepository jobRepository;
-
-    @Autowired
-    private Step myStep1;
+    public JobScheduler(JobLauncher jobLauncher, BatchConfig batchConfig, JobRepository jobRepository, Step myStep1) {
+        this.jobLauncher = jobLauncher;
+        this.batchConfig = batchConfig;
+        this.jobRepository = jobRepository;
+        this.myStep1 = myStep1;
+    }
 
     @Scheduled(fixedRate = 120000) // Runs every 2 minutes
     public void runJob() {
