@@ -31,8 +31,8 @@ file:
 # AWS
 aws:
   ses:
-    from-email: wilson@wilsonkomlan.com
-    to-email: dev@wilsonkomlan.com
+    from-email: from@test.com
+    to-email: to@test.com
   s3:
     bucket:
       name: ws-cron-job-bucket
